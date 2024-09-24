@@ -1,0 +1,105 @@
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+from collections import Counter
+
+# Function to load Iris dataset from a CSV file, skipping the header
+def load_dataset(file_path):
+    data = []
+    with open(file_path, 'r') as file:
+        next(file)  # Skip the header row
+        for line in file:
+            if line.strip():
+                row = line.strip().split(',')
+                features = [float(val) for val in row[1:-1]]  # Skip 'Id' column, convert feature values to float
+                label = row[-1]  # Class label remains as string
+                data.append(features + [label])
+    return data
+
+# Function to calculate Euclidean distance
+def compute_euclidean_distance(instance1, instance2):
+    return np.sqrt(np.sum((instance1 - instance2) ** 2))
+
+# K-NN Classifier
+def knn_predict(training_data, test_instance, k):
+    distances = []
+    
+    # Calculate distance between the test instance and all training samples
+    for sample in training_data:
+        distance = compute_euclidean_distance(np.array(sample[:-1]), np.array(test_instance[:-1]))
+        distances.append((distance, sample[-1]))  # store the distance and the label
+
+    # Sort by distance and get top k nearest neighbors
+    distances.sort(key=lambda x: x[0])
+    k_nearest_neighbors = distances[:k]
+    
+    # Get the most common class (vote)
+    neighbor_labels = [neighbor[1] for neighbor in k_nearest_neighbors]
+    predicted_label = Counter(neighbor_labels).most_common(1)[0][0]
+    
+    return predicted_label
+
+# Function to split data into training and testing sets
+def split_data(data, test_ratio=0.2):
+    random.shuffle(data)
+    split_index = int(len(data) * (1 - test_ratio))
+    return data[:split_index], data[split_index:]
+
+# Function to calculate accuracy
+def calculate_accuracy(true_labels, predicted_labels):
+    correct = np.sum(np.array(true_labels) == np.array(predicted_labels))
+    return correct / len(true_labels)
+
+# Confusion matrix
+def create_confusion_matrix(true_labels, predicted_labels, class_labels):
+    matrix = np.zeros((len(class_labels), len(class_labels)), dtype=int)
+    label_index_map = {label: i for i, label in enumerate(class_labels)}
+    for true, pred in zip(true_labels, predicted_labels):
+        matrix[label_index_map[true]][label_index_map[pred]] += 1
+    return matrix
+
+# Main function to run K-NN and evaluate performance
+def evaluate_knn_model(dataset, k_list, test_ratio=0.2):
+    training_data, testing_data = split_data(dataset, test_ratio)
+    x_test = [row[:-1] for row in testing_data]
+    y_test = [row[-1] for row in testing_data]
+
+    accuracies = []
+    for k in k_list:
+        y_predictions = []
+        for test_sample in testing_data:
+            predicted_label = knn_predict(training_data, test_sample, k)
+            y_predictions.append(predicted_label)
+        
+        accuracy = calculate_accuracy(y_test, y_predictions)
+        accuracies.append(accuracy)
+        
+        # Print results for the maximum k value
+        if k == max(k_list):
+            print(f"Accuracy for k={k}: {accuracy * 100:.2f}%")
+            print("Confusion Matrix:")
+            print(create_confusion_matrix(y_test, y_predictions, list(set(y_test))))
+    
+    return accuracies
+
+# Plotting the accuracy vs k curve
+def plot_accuracy_vs_k(k_list, accuracy_list):
+    plt.figure(figsize=(8, 6))
+    plt.plot(k_list, accuracy_list, marker='o', linestyle='-', color='b')
+    plt.title('K vs Accuracy')
+    plt.xlabel('K (Number of Neighbors)')
+    plt.ylabel('Accuracy')
+    plt.grid(True)
+    plt.show()
+
+# Load the Iris dataset from the file 'Iris.csv'
+iris_data = load_dataset('Iris.csv')  # Path to your iris dataset file
+
+# Define range of k values to test
+k_list = list(range(1, 10))
+
+# Evaluate the classifier
+accuracy_list = evaluate_knn_model(iris_data, k_list)
+
+# Plot k vs accuracy
+plot_accuracy_vs_k(k_list, accuracy_list)
